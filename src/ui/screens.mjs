@@ -28,6 +28,7 @@ const ICON = {
   ranks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V13M12 21V4M18 21V15"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z"/></svg>',
   profile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20c.7-3.4 3.4-5 6.5-5s5.8 1.6 6.5 5"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
 };
 const CARD_ICON = {
   wager: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M16 3l13 7.5v11L16 29 3 21.5v-11z"/><path d="M16 3v26M3 10.5l13 7.5 13-7.5"/></svg>',
@@ -42,9 +43,11 @@ export function createScreens(handlers = {}) {
   const frame = el('div', 'app-frame');
   const bar = el('header', 'app-bar');
   const brand = el('div', 'app-brand', 'PAPER<span>//</span>ARENA');
-  const balanceChip = el('button', 'bal-chip', `<span>${t('common.balance')}</span><strong>${fmtMoney(0)}</strong>`);
-  balanceChip.addEventListener('click', () => showTopup());
-  bar.append(brand, balanceChip);
+  // top-right gear — only visible on the Profile screen (balance now lives in the profile body)
+  const settingsBtn = el('button', 'gear-btn', ICON.gear);
+  settingsBtn.setAttribute('aria-label', t('settings.title'));
+  settingsBtn.addEventListener('click', () => showSettings());
+  bar.append(brand, settingsBtn);
 
   const body = el('div', 'app-body');
   const panels = {};
@@ -94,10 +97,6 @@ export function createScreens(handlers = {}) {
   let lastDeath = null;
   let rerender = renderMenu; // re-render hook for live language switching
 
-  function updateBalanceChip() {
-    balanceChip.querySelector('span').textContent = t('common.balance');
-    if (user) balanceChip.querySelector('strong').textContent = fmtMoney(user.balanceCents);
-  }
   function applyNavLabels() {
     for (const tab of Object.keys(navBtns)) navBtns[tab].querySelector('span').textContent = t(navBtns[tab].dataset.key);
   }
@@ -112,9 +111,8 @@ export function createScreens(handlers = {}) {
     const authed = !!user;
     const chrome = authed && which !== 'death';
     nav.hidden = !chrome;
-    balanceChip.hidden = !chrome;
+    settingsBtn.hidden = !(chrome && which === 'profile'); // gear only on the profile screen
     for (const tab of Object.keys(navBtns)) navBtns[tab].classList.toggle('active', tab === which);
-    updateBalanceChip();
     root.hidden = false;
     root.dataset.open = which;
   }
@@ -279,11 +277,12 @@ export function createScreens(handlers = {}) {
     const p = panels.profile;
     p.innerHTML = '';
     if (!user) { p.appendChild(el('h1', null, t('profile.title'))); p.appendChild(el('p', 'sub', t('profile.signInFirst'))); return; }
-    updateBalanceChip();
     const s = user.stats;
     p.appendChild(el('div', 'avatar', escapeHtml((user.username || '?')[0].toUpperCase())));
     p.appendChild(el('div', 'greet big', `<b>${escapeHtml(user.username)}</b>`));
-    p.appendChild(el('div', 'wallet-wrap', walletBadge(user.balanceCents, user.frozenCents)));
+    const walletWrap = el('div', 'wallet-wrap tappable', walletBadge(user.balanceCents, user.frozenCents));
+    walletWrap.addEventListener('click', () => showTopup()); // tap your balance → top up
+    p.appendChild(walletWrap);
     const grid = el('div', 'stat-grid big');
     const stats = [
       ['stat.games', s.games], ['stat.kills', s.kills], ['stat.deaths', s.deaths], ['stat.kd', s.kd],
@@ -296,9 +295,6 @@ export function createScreens(handlers = {}) {
     const refBtn = el('button', 'btn', t('profile.referrals'));
     refBtn.addEventListener('click', () => showReferrals());
     p.appendChild(refBtn);
-    const setBtn = el('button', 'btn', t('settings.title'));
-    setBtn.addEventListener('click', () => showSettings());
-    p.appendChild(setBtn);
   }
   async function showProfile() {
     show('profile');
@@ -498,10 +494,9 @@ export function createScreens(handlers = {}) {
     if (!w || !user) return;
     user.balanceCents = w.balanceCents;
     user.frozenCents = w.frozenCents;
-    updateBalanceChip();
   }
 
-  onLangChange(() => { applyNavLabels(); updateBalanceChip(); if (!root.hidden) rerender(); });
+  onLangChange(() => { applyNavLabels(); settingsBtn.setAttribute('aria-label', t('settings.title')); if (!root.hidden) rerender(); });
 
   async function bootstrap() {
     applyTheme(getTheme());
