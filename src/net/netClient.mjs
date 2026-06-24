@@ -156,6 +156,7 @@ export class NetClient {
     M.status = d.status === 1 ? 'active' : 'waiting';
     for (const [i, v] of d.ownerChanges) M.owner[i] = v;
     for (const [i, v] of d.trailChanges) M.trail[i] = v;
+    let meRespawned = false;
     for (const pd of d.players) {
       const p = M.players[pd.id];
       if (!p) continue;
@@ -164,6 +165,7 @@ export class NetClient {
       p.x = pd.x; p.y = pd.y; p.dir = pd.dir; p.alive = pd.alive; p.isHuman = pd.isHuman; p.area = pd.area;
       p.trailCells = pd.headTrailCell === NO_TRAIL ? [] : [pd.headTrailCell];
       if (pd.meta) { p.color = pd.meta.color; p.name = pd.meta.name; }
+      if (pd.id === M.youId && !wasAlive && pd.alive) meRespawned = true; // our slot flipped dead->alive
       // Teleport snap: the engine moves exactly 1 cell/tick, so a jump >1 cell or a
       // dead->alive flip is a respawn relocation. Snap prev=cur so the renderer does
       // NOT interpolate a fast "slide" across the whole map (the death/respawn skating).
@@ -173,7 +175,10 @@ export class NetClient {
     }
     const me = M.players[M.youId];
     if (me) this._intentDir = me.dir; // reconcile relative-turn intent to authoritative
-    if (M.over && me && me.alive) { M.over = false; M.deathReason = null; this._emit('respawn'); }
+    // Respawn only on a genuine dead->alive flip of OUR slot. Without this, the jitter buffer
+    // replaying pre-death deltas (where we still look alive) after the real-time death control
+    // message already set over=true would falsely fire respawn and hide the death screen.
+    if (meRespawned) { M.over = false; M.deathReason = null; this._emit('respawn'); }
     M.version += 1;
     this._lastDeltaTime = performance.now();
   }
