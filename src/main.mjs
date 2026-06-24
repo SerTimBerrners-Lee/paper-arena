@@ -87,7 +87,6 @@ function wireNet(n) {
 app.on('update', () => {
   if (!net) return;
   const M = net.mirror;
-  net.pump(performance.now()); // advance the jitter-buffer playout clock
   if (M.players.length && !screens.isOpen()) {
     const cmd = input.getCommand(net.getIntentDir());
     if (cmd) net.sendInput(cmd);
