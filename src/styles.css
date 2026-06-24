@@ -644,9 +644,19 @@
   .screen .dots { display: flex; gap: 0.55rem; justify-content: center; }
   .screen .dot { inline-size: 0.7rem; block-size: 0.7rem; padding: 0; border: 0; border-radius: 50%; cursor: pointer; background: rgb(143 160 200 / 0.4); transition: background 150ms, transform 150ms; }
   .screen .dot.active { background: var(--cyan); transform: scale(1.25); box-shadow: 0 0 8px rgb(0 229 255 / 0.6); }
-  .fair-badge { margin-block-start: 0.6rem; text-align: center; font-size: 0.66rem; letter-spacing: 0.04em; color: var(--muted); opacity: 0.85; }
-  .fair-badge code { font-family: var(--display, monospace); color: var(--cyan); opacity: 0.9; }
-  .menu-arenas .fair-badge { position: absolute; inset-block-end: 0.3rem; inset-inline: 0; margin: 0; }
+
+  /* in-game loading overlay (covers the arena until the first frame renders) */
+  #game-loader { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1.1rem; background: #090a14; }
+  #game-shell.loading #game-loader { display: flex; }
+  #game-shell.loading #game-ui,
+  #game-shell.loading #scoreboard,
+  #game-shell.loading #waiting-banner { display: none !important; }
+  .loader-ring { inline-size: 3rem; block-size: 3rem; border: 3px solid rgb(0 229 255 / 0.18);
+    border-top-color: var(--cyan); border-radius: 50%; animation: loader-spin 0.8s linear infinite; }
+  .loader-text { font: 700 0.78rem/1 var(--display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+  @keyframes loader-spin { to { transform: rotate(360deg); } }
+  [data-theme="light"] #game-loader { background: #e9eef8; }
 
   /* referral block */
   .screen .ref-invite { color: var(--muted); font: 400 var(--ts-body) var(--mono); margin: 0; text-align: start; }

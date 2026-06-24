@@ -232,15 +232,6 @@ export function createScreens(handlers = {}) {
       [...dots.children].forEach((d, i) => d.classList.toggle('active', i === idx));
     });
     p.appendChild(dots);
-
-    // provably-fair badge: the current commit; full reveal history at /fairness
-    const fair = el('div', 'fair-badge', `🔒 ${t('fair.label')}`);
-    fair.title = t('fair.hint');
-    p.appendChild(fair);
-    api.fairness().then((f) => {
-      const c = f && f.wager && f.wager.commit;
-      if (c) fair.innerHTML = `🔒 ${t('fair.label')} · <code>${escapeHtml(c.slice(0, 10))}…</code>`;
-    }).catch(() => {});
   }
 
   async function showMenu() {

@@ -21,14 +21,26 @@ export function createHud({ onMenu } = {}) {
   const lblKills = $('lbl-kills');
   const lblEarned = $('lbl-earned');
 
+  const gameShell = $('game-shell');
+
   let banner = $('waiting-banner');
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'waiting-banner';
     banner.className = 'waiting-banner';
     banner.hidden = true;
-    ($('game-shell') || document.body).appendChild(banner);
+    (gameShell || document.body).appendChild(banner);
   }
+
+  // loading overlay shown while the arena connects + renders its first frame
+  let loader = $('game-loader');
+  if (!loader) {
+    loader = document.createElement('div');
+    loader.id = 'game-loader';
+    loader.innerHTML = '<div class="loader-ring"></div><div class="loader-text"></div>';
+    (gameShell || document.body).appendChild(loader);
+  }
+  const loaderText = loader.querySelector('.loader-text');
 
   if (menuBtn && onMenu) menuBtn.addEventListener('click', () => onMenu());
 
@@ -44,9 +56,14 @@ export function createHud({ onMenu } = {}) {
     if (lblKills) lblKills.textContent = t('hud.kills');
     if (lblEarned) lblEarned.textContent = t('hud.earned');
     if (menuBtn) menuBtn.textContent = t('hud.menu');
+    if (loaderText) loaderText.textContent = t('hud.loading');
     if (waiting) setWaiting(waiting.isWaiting, waiting.humans, waiting.needed);
     if (lastBoard) setScoreboard(lastBoard, lastYou);
   }
+
+  // toggle the full-screen loader; CSS (#game-shell.loading) hides the HUD/scoreboard meanwhile
+  function showLoading() { if (loaderText) loaderText.textContent = t('hud.loading'); if (gameShell) gameShell.classList.add('loading'); }
+  function hideLoading() { if (gameShell) gameShell.classList.remove('loading'); }
 
   function setMode(m) { mode = m; if (earnMetric) earnMetric.hidden = false; } // both modes earn (wager = real, free = practice)
   function setBalance() { /* total balance is intentionally not shown in-game */ }
@@ -117,5 +134,5 @@ export function createHud({ onMenu } = {}) {
   applyLang();
   onLangChange(applyLang);
 
-  return { update, reset, setWaiting, setMode, setBalance, onKill, setScoreboard };
+  return { update, reset, setWaiting, setMode, setBalance, onKill, setScoreboard, showLoading, hideLoading };
 }

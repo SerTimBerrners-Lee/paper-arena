@@ -21,6 +21,8 @@ window.addEventListener('resize', () => app.resizeCanvas(canvas.clientWidth, can
 
 let net = null;
 let renderer = null;
+let firstFramePending = false;
+let connectSeq = 0;
 const input = new InputController({ canvas });
 
 const hud = createHud({
@@ -36,8 +38,15 @@ const screens = createScreens({
 function startGame(mode) {
   const user = screens.getUser();
   screens.enterGame();
+  hud.showLoading();          // loader covers the arena until the first frame renders
   hud.setMode(mode);
   hud.reset();
+  firstFramePending = true;
+  const myConnect = ++connectSeq;
+  // safety: if the arena never renders a first frame (server unreachable), bail to menu
+  setTimeout(() => {
+    if (firstFramePending && connectSeq === myConnect) { leaveToMenu(); screens.toast(t('toast.connectFailed')); }
+  }, 15000);
   net = new NetClient(user ? user.username : 'Guest', { token: getToken(), mode });
   wireNet(net);
   net.connect();
@@ -45,6 +54,8 @@ function startGame(mode) {
 
 function leaveToMenu() {
   if (net) { net.disconnect(); net = null; }
+  firstFramePending = false;
+  hud.hideLoading();
   hud.setScoreboard([]);
   screens.showMenu();
 }
@@ -82,6 +93,7 @@ app.on('update', () => {
   }
   if (renderer) {
     renderer.render(net.getAlpha());
+    if (firstFramePending) { firstFramePending = false; hud.hideLoading(); } // arena drawn → reveal HUD
     hud.update(M);
   }
 });
