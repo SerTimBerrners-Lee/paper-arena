@@ -60,6 +60,7 @@ const DEFAULT_CONFIG = {
   minBotTrail: 9,
   maxBotTrail: 24,
   seed: 1,
+  idleDeathSeconds: 20, // camp safe on your own land this long (no trail/capture/kill) → die of inactivity (0 = off)
 };
 
 // ---- seeded RNG (mulberry32) -------------------------------------------------
@@ -79,6 +80,10 @@ export function makeRng(seed) {
 
 export function createGame(userConfig = {}) {
   const config = { ...DEFAULT_CONFIG, ...userConfig };
+  // resolve the inactivity limit to ticks so it scales with the tick rate
+  config.idleDeathTicks = config.idleDeathTicks != null
+    ? config.idleDeathTicks
+    : Math.round((config.idleDeathSeconds || 0) * config.ticksPerSecond);
   const { cols, rows } = config;
   const n = cols * rows;
 
@@ -161,6 +166,7 @@ function spawnPlayers(game) {
       nextDir: null,
       alive: true,
       area: 0,
+      idleTicks: 0, // ticks spent camping (no trail/capture/kill) on own land; resets on activity
       trailCells: [],
       // bot bookkeeping
       maxTrail:
@@ -242,6 +248,7 @@ export function respawnPlayer(game, id) {
   p.nextDir = null;
   p.trailCells.length = 0;
   p._reason = null;
+  p.idleTicks = 0;
   p.maxTrail =
     config.minBotTrail +
     Math.floor(game.rng() * (config.maxBotTrail - config.minBotTrail + 1));
@@ -409,6 +416,32 @@ export function tickGame(game) {
       game.trail[i] = p.id;
       p.trailCells.push(i);
       game.version += 1;
+    }
+  }
+
+  // 5. Inactivity timer — a player camping SAFE on its own land (no open trail, no
+  //    capture, no kill this tick) for `idleDeathTicks` ticks dies of inactivity.
+  //    Leaving your territory (laying a trail), capturing, or killing keeps you active,
+  //    so the only way this fires is genuine camping. Applies to humans and bots alike.
+  const idleLimit = game.config.idleDeathTicks;
+  if (idleLimit > 0) {
+    const active = new Set();
+    for (const e of game.events) {
+      if (e.type === 'capture') active.add(e.id);
+      else if (e.type === 'death' && e.killerId != null && e.killerId !== e.id) active.add(e.killerId);
+    }
+    for (const p of players) {
+      if (!p.alive) { p.idleTicks = 0; continue; }
+      if (p.trailCells.length > 0 || active.has(p.id)) { p.idleTicks = 0; continue; }
+      p.idleTicks += 1;
+      if (p.idleTicks >= idleLimit) {
+        killPlayer(game, p);
+        p._reason = 'idle';
+        p._killerId = null;
+        p.idleTicks = 0;
+        game.events.push({ type: 'death', id: p.id, reason: 'idle', killerId: null });
+        if (p.isHuman) { game.over = true; game.deathReason = 'idle'; }
+      }
     }
   }
 

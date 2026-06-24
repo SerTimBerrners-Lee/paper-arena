@@ -42,6 +42,19 @@ export function createHud({ onMenu } = {}) {
   }
   const loaderText = loader.querySelector('.loader-text');
 
+  // inactivity countdown — big number shown in the last seconds before idle death
+  let idleEl = $('idle-countdown');
+  if (!idleEl) {
+    idleEl = document.createElement('div');
+    idleEl.id = 'idle-countdown';
+    idleEl.className = 'idle-countdown';
+    idleEl.hidden = true;
+    idleEl.innerHTML = '<div class="idle-num"></div><div class="idle-label"></div>';
+    (gameShell || document.body).appendChild(idleEl);
+  }
+  const idleNum = idleEl.querySelector('.idle-num');
+  const idleLabel = idleEl.querySelector('.idle-label');
+
   if (menuBtn && onMenu) menuBtn.addEventListener('click', () => onMenu());
 
   let mode = 'wager';
@@ -50,6 +63,20 @@ export function createHud({ onMenu } = {}) {
   let lastBoard = null;
   let lastYou = -1;
   let waiting = null;
+  let idleSecs = 0;
+
+  // Inactivity countdown: build territory or get a kill before it hits zero.
+  function setIdle(seconds) {
+    idleSecs = seconds | 0;
+    if (idleSecs > 0) {
+      idleNum.textContent = String(idleSecs);
+      idleLabel.textContent = t('hud.idleWarn');
+      idleEl.hidden = false;
+      idleEl.classList.remove('tick'); void idleEl.offsetWidth; idleEl.classList.add('tick');
+    } else {
+      idleEl.hidden = true;
+    }
+  }
 
   function applyLang() {
     if (lblTerritory) lblTerritory.textContent = t('hud.territory');
@@ -57,6 +84,7 @@ export function createHud({ onMenu } = {}) {
     if (lblEarned) lblEarned.textContent = t('hud.earned');
     if (menuBtn) menuBtn.textContent = t('hud.menu');
     if (loaderText) loaderText.textContent = t('hud.loading');
+    if (idleSecs > 0) idleLabel.textContent = t('hud.idleWarn');
     if (waiting) setWaiting(waiting.isWaiting, waiting.humans, waiting.needed);
     if (lastBoard) setScoreboard(lastBoard, lastYou);
   }
@@ -129,10 +157,11 @@ export function createHud({ onMenu } = {}) {
     if (killsEl) killsEl.textContent = '0';
     if (earnedEl) earnedEl.textContent = fmtMoney(0);
     if (liveEl) liveEl.textContent = '';
+    setIdle(0);
   }
 
   applyLang();
   onLangChange(applyLang);
 
-  return { update, reset, setWaiting, setMode, setBalance, onKill, setScoreboard, showLoading, hideLoading };
+  return { update, reset, setWaiting, setMode, setBalance, onKill, setScoreboard, showLoading, hideLoading, setIdle };
 }

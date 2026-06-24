@@ -20,6 +20,7 @@ const TICK_MS = 1000 / 12;
 const RESPAWN_TICKS = 24;        // bots come back ~2s after death
 const SEND_HIGH_WATER = 128 * 1024; // bytes buffered to a socket before we treat the client as "behind"
 const SEND_RESYNC_LOW = 16 * 1024;  // once its buffer drains below this, resync that client with a keyframe
+const IDLE_WARN_TICKS = 6 * 12;     // show the inactivity countdown over the last 6 seconds
 const EPOCH_TICKS = 12 * 60 * 3; // ~3 min of active play per provably-fair epoch
 
 function sanitizeName(n) {
@@ -147,8 +148,26 @@ export class Arena {
     this.metaDirty.clear();
     this.broadcast(delta);
     if (this.game.tick % 6 === 0) this.broadcastScoreboard();
+    this.broadcastIdleWarnings();
     // 8. rotate the provably-fair epoch (reveal the old seed, commit to a new one)
     if (this.game.tick - this._epochStartTick >= EPOCH_TICKS) this._rollEpoch();
+  }
+
+  // Tell each human how many seconds until inactivity death — only inside the warning
+  // window and only when the displayed second changes (so it isn't spammed every tick).
+  broadcastIdleWarnings() {
+    const limit = this.game.config.idleDeathTicks;
+    if (!limit) return;
+    for (const s of this.sessions) {
+      if (s.slotId < 0) continue;
+      const p = this.game.players[s.slotId];
+      let secs = 0;
+      if (p && p.alive) {
+        const left = limit - p.idleTicks;
+        if (left > 0 && left <= IDLE_WARN_TICKS) secs = Math.ceil(left / 12);
+      }
+      if (s.idleWarn !== secs) { s.idleWarn = secs; this.sendJSON(s, { type: 'idle', seconds: secs }); }
+    }
   }
 
   // ── provably-fair epoch rotation ─────────────────────────────────────────────

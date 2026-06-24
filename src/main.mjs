@@ -56,6 +56,7 @@ function leaveToMenu() {
   if (net) { net.disconnect(); net = null; }
   firstFramePending = false;
   hud.hideLoading();
+  hud.setIdle(0);
   hud.setScoreboard([]);
   screens.showMenu();
 }
@@ -68,13 +69,14 @@ function wireNet(n) {
     hud.reset();
   });
   n.on('status', (status, humans, needed) => hud.setWaiting(status === 'waiting', humans, needed));
-  n.on('respawn', () => { hud.reset(); screens.enterGame(); });
+  n.on('respawn', () => { hud.setIdle(0); hud.reset(); screens.enterGame(); });
   n.on('wallet', (w) => screens.setWallet(w));
   n.on('kill', (k) => {
     hud.onKill(k.rewardCents, k.kills);
     if (k.wallet) screens.setWallet(k.wallet);
   });
-  n.on('death', (d) => { screens.setWallet(d.wallet); screens.showDeath(d); });
+  n.on('idle', (secs) => hud.setIdle(secs));
+  n.on('death', (d) => { hud.setIdle(0); screens.setWallet(d.wallet); screens.showDeath(d); });
   n.on('scoreboard', (rows) => hud.setScoreboard(rows, n.mirror.youId));
   n.on('error', (code) => {
     if (code === 'insufficient_funds') { leaveToMenu(); screens.toast(t('toast.notEnough')); }
