@@ -39,4 +39,18 @@ describe('inactivity death', () => {
     expect(p.alive).toBe(true);
     expect(p.idleTicks).toBe(0);
   });
+
+  it('clears a wall-jammed bot after the stuck grace (frees its stray trail)', () => {
+    const game = createGame({ cols: 60, rows: 60, botCount: 1, botStuckTicks: 3, seed: 7 });
+    const bot = game.players[1];
+    bot.x = bot.prevX = 0; bot.y = bot.prevY = 30; bot.dir = 'left'; bot.nextDir = null; // target is off-grid → can't move
+    bot.alive = true; bot._stuckTicks = 0;
+    let reason = null;
+    for (let i = 0; i < 4; i += 1) {
+      const d = tickGame(game).find((e) => e.type === 'death' && e.id === 1);
+      if (d) reason = d.reason;
+    }
+    expect(bot.alive).toBe(false);
+    expect(reason).toBe('wall');
+  });
 });

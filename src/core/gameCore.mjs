@@ -61,6 +61,7 @@ const DEFAULT_CONFIG = {
   maxBotTrail: 24,
   seed: 1,
   idleDeathSeconds: 20, // camp safe on your own land this long (no trail/capture/kill) → die of inactivity (0 = off)
+  botStuckTicks: 24,    // a wall-jammed / boxed-in BOT that can't move dies after this many ticks (clears stray trails; 0 = off)
 };
 
 // ---- seeded RNG (mulberry32) -------------------------------------------------
@@ -166,7 +167,8 @@ function spawnPlayers(game) {
       nextDir: null,
       alive: true,
       area: 0,
-      idleTicks: 0, // ticks spent camping (no trail/capture/kill) on own land; resets on activity
+      idleTicks: 0,  // ticks spent camping (no trail/capture/kill) on own land; resets on activity
+      _stuckTicks: 0, // consecutive ticks a bot couldn't move (wall/boxed); resets on any move
       trailCells: [],
       // bot bookkeeping
       maxTrail:
@@ -249,6 +251,7 @@ export function respawnPlayer(game, id) {
   p.trailCells.length = 0;
   p._reason = null;
   p.idleTicks = 0;
+  p._stuckTicks = 0;
   p.maxTrail =
     config.minBotTrail +
     Math.floor(game.rng() * (config.maxBotTrail - config.minBotTrail + 1));
@@ -424,21 +427,38 @@ export function tickGame(game) {
   //    Leaving your territory (laying a trail), capturing, or killing keeps you active,
   //    so the only way this fires is genuine camping. Applies to humans and bots alike.
   const idleLimit = game.config.idleDeathTicks;
-  if (idleLimit > 0) {
+  const stuckLimit = game.config.botStuckTicks;
+  if (idleLimit > 0 || stuckLimit > 0) {
     const active = new Set();
     for (const e of game.events) {
       if (e.type === 'capture') active.add(e.id);
       else if (e.type === 'death' && e.killerId != null && e.killerId !== e.id) active.add(e.killerId);
     }
     for (const p of players) {
-      if (!p.alive) { p.idleTicks = 0; continue; }
+      if (!p.alive) { p.idleTicks = 0; p._stuckTicks = 0; continue; }
+
+      // A boxed-in / wall-jammed BOT that can't move shouldn't sit forever leaving a
+      // stray trail; clear it after a short grace. (Humans keep forgiving walls.)
+      const moved = p.x !== p.prevX || p.y !== p.prevY;
+      if (stuckLimit > 0 && !p.isHuman && !moved) {
+        p._stuckTicks += 1;
+        if (p._stuckTicks >= stuckLimit) {
+          killPlayer(game, p);
+          p._reason = 'wall'; p._killerId = null; p._stuckTicks = 0; p.idleTicks = 0;
+          game.events.push({ type: 'death', id: p.id, reason: 'wall', killerId: null });
+          continue;
+        }
+      } else {
+        p._stuckTicks = 0;
+      }
+
+      // Inactivity timer (camping on own land).
+      if (idleLimit <= 0) continue;
       if (p.trailCells.length > 0 || active.has(p.id)) { p.idleTicks = 0; continue; }
       p.idleTicks += 1;
       if (p.idleTicks >= idleLimit) {
         killPlayer(game, p);
-        p._reason = 'idle';
-        p._killerId = null;
-        p.idleTicks = 0;
+        p._reason = 'idle'; p._killerId = null; p.idleTicks = 0;
         game.events.push({ type: 'death', id: p.id, reason: 'idle', killerId: null });
         if (p.isHuman) { game.over = true; game.deathReason = 'idle'; }
       }
