@@ -1,0 +1,21 @@
+# dependencies & build output
+node_modules/
+dist/
+output/
+
+# local runtime data (sqlite db, WAL/SHM)
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# old replaced code kept locally as a backup
+_codex_backup/
+
+# env & secrets
+.env
+.env.*
+
+# os / editor
+.DS_Store
+*.log

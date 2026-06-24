@@ -1,0 +1,21 @@
+{
+  "name": "paper-arena",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.2.13",
+  "scripts": {
+    "dev": "bunx --bun vite --host 0.0.0.0",
+    "build": "bunx --bun vite build",
+    "server": "bun run server/index.mjs",
+    "dev:all": "bun run server/index.mjs & bunx --bun vite --host 0.0.0.0",
+    "test": "bun test test"
+  },
+  "dependencies": {
+    "earcut": "^3.0.2",
+    "playcanvas": "^2.19.1"
+  },
+  "devDependencies": {
+    "vite": "^6.4.3"
+  }
+}

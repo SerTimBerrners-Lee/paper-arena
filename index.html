@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>PAPER//ARENA</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300e5ff'/%3E%3Cpath d='M8 8h12v5h-7v11H8z' fill='%23090a14'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>try { document.documentElement.dataset.theme = localStorage.getItem('paper_theme') || 'dark'; } catch (e) {}</script>
+  </head>
+  <body>
+    <a class="skip-link" href="#game-ui">Skip to game controls</a>
+    <main id="game-shell" tabindex="-1">
+      <canvas id="application" aria-label="Paper Arena game arena"></canvas>
+      <section id="game-ui" class="hud" aria-label="Match status">
+        <div class="metric">
+          <span id="lbl-territory">Territory</span>
+          <strong id="territory-value">0%</strong>
+        </div>
+        <div class="metric">
+          <span id="lbl-kills">Kills</span>
+          <strong id="kills-value">0</strong>
+        </div>
+        <div class="metric metric-earn" id="earn-metric">
+          <span id="lbl-earned">Earned</span>
+          <strong id="earned-value">◇0.00</strong>
+        </div>
+        <button id="restart-button" class="restart-button" type="button">MENU</button>
+      </section>
+      <div id="kill-floats" class="kill-floats" aria-hidden="true"></div>
+      <div id="scoreboard" class="scoreboard" aria-hidden="true" hidden></div>
+      <div id="live-status" class="visually-hidden" aria-live="polite"></div>
+    </main>
+    <script type="module" src="/src/main.mjs"></script>
+  </body>
+</html>
