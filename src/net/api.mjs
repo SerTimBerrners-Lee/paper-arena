@@ -39,6 +39,7 @@ export const api = {
   referrals: () => req('/referrals/me'),
   profile: (id) => req(id ? `/profile/${encodeURIComponent(id)}` : '/profile/me'),
   leaderboard: (metric = 'earned') => req(`/leaderboard?metric=${metric}`),
+  fairness: () => req('/fairness'),
 };
 
 // Virtual in-game currency "Credits" (◇), shown 1:1 with the stored dollar value.

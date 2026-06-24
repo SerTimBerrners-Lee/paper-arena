@@ -285,22 +285,6 @@ export const endLifeByDeath = db.transaction((victimMpId, opts = {}) => {
   return { stakeCents: stake, payoutToKillerCents: payout, killerUserId: hasKiller ? killerUserId : null };
 });
 
-// Voluntarily leave with the stake (only legal when alive + on own land + no trail;
-// that gate is enforced by the caller). escrow -> user.
-export const endLifeByCashout = db.transaction((mpId, opts = {}) => {
-  const mp = getMatchPlayer(mpId);
-  if (!mp || mp.ended_at != null) return null;
-  const stake = mp.stake_cents;
-  const { victimKills = 0, victimArea = 0, victimDurationMs = 0 } = opts;
-  post(randomUUID(), 'escrow', `user:${mp.user_id}`, stake, 'cashout', `cashout:${mpId}`, mpId);
-  db.prepare('UPDATE users SET frozen_cents = frozen_cents - ? WHERE id = ?').run(stake, mp.user_id);
-  db.prepare(`UPDATE match_players SET ended_at = ?, result = 'cashout', stake_returned_cents = ?,
-                 kills = ?, max_area_cells = ?, duration_ms = ? WHERE id = ?`)
-    .run(Date.now(), stake, victimKills, victimArea, victimDurationMs, mpId);
-  bumpStats(mp.user_id, { returned: stake, area: victimArea, streak: victimKills });
-  return { returnedCents: stake };
-});
-
 // A bot has no stake of its own, but we treat it AS IF it paid the entry fee:
 // killing a bot mints the same 90% reward to the human killer (10% rake to house).
 // This injects money into circulation (mint just goes more negative), so the

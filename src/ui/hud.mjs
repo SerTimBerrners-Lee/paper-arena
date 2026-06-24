@@ -6,7 +6,6 @@ import { t, onLangChange } from '../i18n.mjs';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const money0 = (cents) => `◇ ${((cents || 0) / 100).toFixed(2)}`; // thin-space gap (matches fmtMoney)
 
 export function createHud({ onMenu } = {}) {
   const $ = (id) => document.getElementById(id);
@@ -68,9 +67,9 @@ export function createHud({ onMenu } = {}) {
     kills = killsTotal != null ? killsTotal : kills + 1;
     earnedCents += rewardCents || 0;
     if (killsEl) { killsEl.textContent = String(kills); pulse(killsEl); }
-    if (earnedEl) { earnedEl.textContent = money0(earnedCents); pulse(earnedEl); }
-    if (rewardCents > 0) spawnFloat(`+${money0(rewardCents)}`);
-    if (liveEl) liveEl.textContent = rewardCents ? `+${money0(rewardCents)}` : 'Kill';
+    if (earnedEl) { earnedEl.textContent = fmtMoney(earnedCents); pulse(earnedEl); }
+    if (rewardCents > 0) spawnFloat(`+${fmtMoney(rewardCents)}`);
+    if (liveEl) liveEl.textContent = rewardCents ? `+${fmtMoney(rewardCents)}` : 'Kill';
   }
 
   function update(game) {
@@ -92,7 +91,7 @@ export function createHud({ onMenu } = {}) {
       + `<span class="sb-rank">${i + 1}</span>`
       + `<span class="sb-name">${esc(r.name)}</span>`
       + `<span class="sb-kills">${r.kills}</span>`
-      + (showEarn ? `<span class="sb-earn">${money0(r.earnedCents || 0)}</span>` : '')
+      + (showEarn ? `<span class="sb-earn">${fmtMoney(r.earnedCents || 0)}</span>` : '')
       + '</div>').join('');
   }
 
@@ -111,7 +110,7 @@ export function createHud({ onMenu } = {}) {
     kills = 0;
     earnedCents = 0;
     if (killsEl) killsEl.textContent = '0';
-    if (earnedEl) earnedEl.textContent = money0(0);
+    if (earnedEl) earnedEl.textContent = fmtMoney(0);
     if (liveEl) liveEl.textContent = '';
   }
 

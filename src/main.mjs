@@ -5,7 +5,7 @@ import { InputController } from './adapters/inputController.mjs';
 import { createHud } from './ui/hud.mjs';
 import { createScreens } from './ui/screens.mjs';
 import { NetClient } from './net/netClient.mjs';
-import { getToken, fmtMoney } from './net/api.mjs';
+import { getToken } from './net/api.mjs';
 import { t } from './i18n.mjs';
 
 const canvas = document.querySelector('#application');

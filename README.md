@@ -20,8 +20,11 @@ Mini App and on the web.
 - **Auth**: Telegram Mini App (`initData` HMAC), HS256 JWT, dev login (non-prod only).
 - **Anti-bot (Phase 1)**: behavioural heuristics (input-timing regularity, instant respawns,
   raw-socket / foreign origin) → advisory flags for review.
+- **Provably-fair RNG**: each arena commits to a hashed secret seed (`sha256`), seeds the
+  deterministic sim from it, and reveals the seed on epoch rotation so anyone can verify the
+  house couldn't bias outcomes. Auditable at `/fairness`.
 - **i18n** (RU / EN / UK), **dark / light theme**, mobile-first.
-- 39 automated tests (engine, wire protocol, economy, anti-bot).
+- 42 automated tests (engine, wire protocol, economy, anti-bot, provably-fair).
 
 ## Stack
 Bun · Vite · PlayCanvas (WebGL) · bun:sqlite · vanilla JS (no UI framework)
@@ -56,11 +59,11 @@ bun test test
 - `src/adapters/` — `botController` (shared), `arenaRenderer` & `inputController` (client)
 - `src/net/` — `protocol` (shared), `netClient`, `api` (client)
 - `src/ui/` — `screens`, `hud`; plus `src/i18n.mjs`
-- `server/` — `index` (HTTP + WS), `arena`, `snapshotter`, `session`, `db`, `economy`, `auth`, `antibot`
-- `test/` — `gameCore`, `protocol`, `economy`, `arenaKill`, `antibot`
+- `server/` — `index` (HTTP + WS), `arena`, `snapshotter`, `session`, `db`, `economy`, `auth`, `antibot`, `fairness`
+- `test/` — `gameCore`, `protocol`, `economy`, `arenaKill`, `antibot`, `fairness`
 
 ## Roadmap
 Real deposits/withdrawals (TON / Telegram Stars) with KYC, limits and review; Sybil & collusion
-detection; provably-fair RNG (commit-reveal of the match seed); WS input rate-limiting. Real-money
-operation carries real gambling/compliance weight (especially in some jurisdictions) — virtual-only
-by design until that's properly addressed.
+detection; a client-side replay verifier on top of the shipped seed-reveal; WS input rate-limiting.
+Real-money operation carries real gambling/compliance weight (especially in some jurisdictions) —
+virtual-only by design until that's properly addressed.

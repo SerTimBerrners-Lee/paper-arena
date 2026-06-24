@@ -87,6 +87,8 @@ const server = Bun.serve({
 
     // ── reads ─────────────────────────────────────────────────────────────────
     if (path === '/config') return json({ stakeCents: DEFAULT_STAKE_CENTS, minHumans: arenaWager.minHumans, slots: arenaWager.maxSlots });
+    // provably-fair: current commit per arena + recently revealed seeds to verify
+    if (path === '/fairness') return json({ wager: arenaWager.getFairness(), free: arenaFree.getFairness() });
     if (path === '/leaderboard') {
       const m = url.searchParams.get('metric');
       const metric = (m === 'net' || m === 'referrals') ? m : 'earned';

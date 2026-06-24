@@ -644,6 +644,9 @@
   .screen .dots { display: flex; gap: 0.55rem; justify-content: center; }
   .screen .dot { inline-size: 0.7rem; block-size: 0.7rem; padding: 0; border: 0; border-radius: 50%; cursor: pointer; background: rgb(143 160 200 / 0.4); transition: background 150ms, transform 150ms; }
   .screen .dot.active { background: var(--cyan); transform: scale(1.25); box-shadow: 0 0 8px rgb(0 229 255 / 0.6); }
+  .fair-badge { margin-block-start: 0.6rem; text-align: center; font-size: 0.66rem; letter-spacing: 0.04em; color: var(--muted); opacity: 0.85; }
+  .fair-badge code { font-family: var(--display, monospace); color: var(--cyan); opacity: 0.9; }
+  .menu-arenas .fair-badge { position: absolute; inset-block-end: 0.3rem; inset-inline: 0; margin: 0; }
 
   /* referral block */
   .screen .ref-invite { color: var(--muted); font: 400 var(--ts-body) var(--mono); margin: 0; text-align: start; }
@@ -666,10 +669,7 @@
   /* app-bar: brand truncates, balance + gear pinned right (fixes mobile drift) */
   .app-bar { gap: 0.5rem; flex-wrap: nowrap; align-items: center; }
   .app-brand { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar-right { display: flex; align-items: center; gap: 0.5rem; flex: 0 1 auto; min-inline-size: 0; }
   .bal-chip { flex: 0 1 auto; min-inline-size: 0; overflow: hidden; white-space: nowrap; }
-  .gear-btn { flex: 0 0 auto; inline-size: 2.3rem; block-size: 2.3rem; display: grid; place-items: center; padding: 0; cursor: pointer; color: var(--cyan); background: rgb(8 14 26 / 0.85); border: 1px solid rgb(0 229 255 / 0.3); clip-path: var(--cut-shape); font-size: 1.15rem; line-height: 1; }
-  .gear-btn[hidden] { display: none; }
 
   /* ═══ light theme ═══ */
   [data-theme="light"] { --ink: #0e1726; --muted: #5a6a86; --cyan: #0089b3; --magenta: #c01a9e; --yellow: #9a7a00; --danger: #c8203f; }
@@ -680,7 +680,7 @@
   [data-theme="light"] .app-frame { background: linear-gradient(180deg, #f6f9fe, #e9eef8); border-color: rgb(0 137 179 / 0.3); box-shadow: 0 0 40px rgb(0 137 179 / 0.12); }
   [data-theme="light"] .app-bar, [data-theme="light"] .app-nav { background: rgb(255 255 255 / 0.45); }
   [data-theme="light"] .wallet-badge, [data-theme="light"] .stat, [data-theme="light"] .lb-row,
-  [data-theme="light"] .arena-card, [data-theme="light"] .bal-chip, [data-theme="light"] .gear-btn,
+  [data-theme="light"] .arena-card, [data-theme="light"] .bal-chip,
   [data-theme="light"] .text-input, [data-theme="light"] .ref-link-input, [data-theme="light"] .lang-btn, [data-theme="light"] .tabs button,
   [data-theme="light"] .btn { background: rgb(255 255 255 / 0.85) !important; border-color: rgb(0 137 179 / 0.28); }
   [data-theme="light"] .screen-flash { background: rgb(255 255 255 / 0.95); color: #7a5f00; }

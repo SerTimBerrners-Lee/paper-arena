@@ -65,7 +65,6 @@ export class NetClient {
     if (this.ws && this.ws.readyState === 1) this.ws.send(encodeInput(dir));
   }
   sendRespawn() { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type: 'respawn' })); }
-  sendCashout() { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type: 'cashout' })); }
   sendResync() { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type: 'resync' })); }
 
   getIntentDir() {
@@ -77,17 +76,6 @@ export class NetClient {
     if (!this._lastDeltaTime) return 1;
     const dt = performance.now() - this._lastDeltaTime;
     return dt < 0 ? 0 : dt > TICK_MS ? 1 : dt / TICK_MS;
-  }
-
-  // current player on own land with no open trail -> cash-out is legal (UI hint)
-  canCashout() {
-    if (this.mode !== 'wager') return false;
-    const M = this.mirror;
-    const me = M.players[M.youId];
-    if (!me || !me.alive || M.over) return false;
-    if (me.trailCells && me.trailCells.length > 0) return false;
-    const i = me.y * M.cols + me.x;
-    return M.owner[i] === me.id;
   }
 
   _onMessage(data) {
@@ -104,7 +92,6 @@ export class NetClient {
       case 'wallet': this._emit('wallet', m); break;
       case 'kill': this._emit('kill', m); break;
       case 'death': this.mirror.over = true; this.mirror.deathReason = m.reason; this._emit('death', m); break;
-      case 'cashout': this._emit('cashout', m); break;
       case 'scoreboard': this._emit('scoreboard', m.rows); break;
       case 'error': this._emit('error', m.code); break;
       default: break;

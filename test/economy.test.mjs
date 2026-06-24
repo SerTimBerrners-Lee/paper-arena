@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 // Use an isolated in-memory DB — must be set before economy.mjs (→ db.mjs) loads.
 process.env.DB_PATH = ':memory:';
 const {
-  getOrCreateUser, grant, createMatch, startLife, endLifeByDeath, endLifeByCashout,
+  getOrCreateUser, grant, createMatch, startLife, endLifeByDeath,
   settleBotKill, getWallet, getProfile, reconcile, WELCOME_GRANT_CENTS,
 } = await import('../server/economy.mjs');
 
@@ -114,18 +114,6 @@ describe('economy ledger', () => {
     expect(res.payoutToKillerCents).toBe(0);
     expect(getWallet(u.id).frozenCents).toBe(0);
     expect(getProfile(u.id).stats.netProfitCents).toBe(-20); // staked, got nothing back
-    expect(reconcile().ok).toBe(true);
-  });
-
-  it('returns the stake on cash-out', () => {
-    const u = mkUser('cashier');
-    const m = createMatch('wager', 20);
-    const start = getWallet(u.id).balanceCents;
-    const mp = startLife(u.id, m, 9, 20);
-    expect(getWallet(u.id).balanceCents).toBe(start - 20);
-    endLifeByCashout(mp, { victimArea: 50 });
-    expect(getWallet(u.id).balanceCents).toBe(start); // got it back
-    expect(getWallet(u.id).frozenCents).toBe(0);
     expect(reconcile().ok).toBe(true);
   });
 

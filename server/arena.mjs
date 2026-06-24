@@ -2,7 +2,7 @@
 // Owns ONE deterministic game, ticks it at 12 tps, drives bots, applies human
 // inputs, broadcasts deltas, and (for wager humans) freezes a stake per life and
 // settles it on death/cash-out via the double-entry ledger. Bots are non-economic.
-import { createGame, setDirection, tickGame, respawnPlayer } from '../src/core/gameCore.mjs';
+import { createGame, setDirection, tickGame, respawnPlayer, makeRng } from '../src/core/gameCore.mjs';
 import { BotController } from '../src/adapters/botController.mjs';
 import { Snapshotter } from './snapshotter.mjs';
 import { Session } from './session.mjs';
@@ -12,11 +12,13 @@ import {
   practiceStake, practiceReward, getPracticeWallet, recordBotFlag,
 } from './economy.mjs';
 import { scoreTelemetry, SUSPECT_THRESHOLD, noteInput, noteDeath, noteRespawn } from './antibot.mjs';
+import { newRound } from './fairness.mjs';
 
 const MAX_SLOTS = 16;
 const MIN_HUMANS = 2;
 const TICK_MS = 1000 / 12;
-const RESPAWN_TICKS = 24; // bots come back ~2s after death
+const RESPAWN_TICKS = 24;        // bots come back ~2s after death
+const EPOCH_TICKS = 12 * 60 * 3; // ~3 min of active play per provably-fair epoch
 
 function sanitizeName(n) {
   if (typeof n !== 'string') return '';
@@ -30,9 +32,14 @@ export class Arena {
     // free arena starts the moment one human is in (play vs bots, no waiting)
     this.minHumans = minHumans != null ? minHumans : (mode === 'free' ? 1 : MIN_HUMANS);
     this.stakeCents = DEFAULT_STAKE_CENTS;
+    // provably-fair: commit to a secret seed, seed the house RNG from it, reveal on rotation
+    this.fair = newRound();
+    this.epoch = 1;
+    this.reveals = [];          // recent {epoch, commit, serverSeed} for /fairness audit
+    this._epochStartTick = 0;
     this.game = createGame({
       cols: 110, rows: 110, ticksPerSecond: 12, botCount: MAX_SLOTS - 1, startRadius: 1,
-      seed: (Date.now() >>> 0) || 1,
+      seed: this.fair.numericSeed,
     });
     // All slots start as (unowned) bots — even slot 0, which createGame marks human.
     this.game.players[0].isHuman = false;
@@ -138,6 +145,24 @@ export class Arena {
     this.metaDirty.clear();
     this.broadcast(delta);
     if (this.game.tick % 6 === 0) this.broadcastScoreboard();
+    // 8. rotate the provably-fair epoch (reveal the old seed, commit to a new one)
+    if (this.game.tick - this._epochStartTick >= EPOCH_TICKS) this._rollEpoch();
+  }
+
+  // ── provably-fair epoch rotation ─────────────────────────────────────────────
+  // The just-ended epoch's seed is now safe to reveal (its outcomes are in the past);
+  // anyone can check sha256(serverSeed) === the commit we published for that epoch.
+  // Then we commit to a fresh secret seed and re-seed the house RNG from it.
+  _rollEpoch() {
+    this.reveals.unshift({ epoch: this.epoch, commit: this.fair.commit, serverSeed: this.fair.serverSeed });
+    if (this.reveals.length > 20) this.reveals.length = 20;
+    this.fair = newRound();
+    this.epoch += 1;
+    this._epochStartTick = this.game.tick;
+    this.game.rng = makeRng(this.fair.numericSeed);
+  }
+  getFairness() {
+    return { mode: this.mode, epoch: this.epoch, commit: this.fair.commit, epochTicks: EPOCH_TICKS, reveals: this.reveals };
   }
 
   // Top players by kills (alive only; bots included) for the in-game corner board.
@@ -243,7 +268,6 @@ export class Arena {
     try { m = JSON.parse(text); } catch { return; }
     if (m.type === 'hello') this.joinSlot(s, m.name);
     else if (m.type === 'respawn') this.respawn(s);
-    else if (m.type === 'cashout') this.cashout(s);
     else if (m.type === 'resync') this.sendKeyframe(s);
     else if (m.type === 'ping') this.sendJSON(s, { type: 'pong', t: m.t });
   }
@@ -317,21 +341,6 @@ export class Arena {
     this.metaDirty.add(s.slotId);
     this.deadTicks[s.slotId] = 0;
     this.fragCount[s.slotId] = 0;
-  }
-
-  // Cash out: only legal while ALIVE, standing on your own land, with no open trail.
-  cashout(s) {
-    const id = s.slotId;
-    if (id < 0) return;
-    const p = this.game.players[id];
-    const life = this.lives[id];
-    if (!p.alive || !life || life.mpId == null) { this.sendJSON(s, { type: 'error', code: 'cashout_unavailable' }); return; }
-    const onOwnLand = this.game.owner[p.y * this.game.cols + p.x] === id;
-    if (p.trailCells.length > 0 || !onOwnLand) { this.sendJSON(s, { type: 'error', code: 'cashout_unsafe' }); return; }
-    const res = endLifeByCashout(life.mpId, { victimKills: life.kills, victimArea: life.maxArea, victimDurationMs: Date.now() - life.startMs });
-    this.lives[id] = null;
-    this.sendJSON(s, { type: 'cashout', returnedCents: res ? res.returnedCents : 0, kills: life.kills, areaCells: life.maxArea, wallet: s.userId ? getWallet(s.userId) : null });
-    this.releaseSlot(s); // leave the arena (slot flips back to a bot)
   }
 
   releaseSlot(s) {

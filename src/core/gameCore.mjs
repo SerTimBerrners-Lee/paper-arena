@@ -64,7 +64,7 @@ const DEFAULT_CONFIG = {
 
 // ---- seeded RNG (mulberry32) -------------------------------------------------
 
-function makeRng(seed) {
+export function makeRng(seed) {
   let a = (seed >>> 0) || 1;
   return function rng() {
     a |= 0;
