@@ -519,6 +519,7 @@
   .screen .lb-empty { color: var(--muted); font: 400 var(--ts-body) var(--mono); text-align: center; list-style: none; padding: 1.2rem; }
 
   .screen .death-title { color: var(--danger); text-shadow: 0 0 18px rgb(255 46 87 / 0.7); }
+  .screen .death-title.win { color: var(--yellow); text-shadow: 0 0 22px rgb(247 238 18 / 0.7); }
   .screen .death-reason { margin: 0; color: var(--muted); font: 400 var(--ts-body) var(--mono); }
   .screen .econ-line { color: var(--ink); letter-spacing: 0.06em; text-transform: uppercase; font: 700 var(--ts-cap) var(--display); }
   .screen .econ-line .neg { color: var(--danger); margin-inline-start: 0.5rem; font-size: var(--ts-value); }

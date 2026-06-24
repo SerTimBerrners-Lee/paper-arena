@@ -77,6 +77,7 @@ function wireNet(n) {
   });
   n.on('idle', (secs) => hud.setIdle(secs));
   n.on('death', (d) => { hud.setIdle(0); screens.setWallet(d.wallet); screens.showDeath(d); });
+  n.on('victory', (d) => { hud.setIdle(0); screens.setWallet(d.wallet); screens.showDeath({ ...d, won: true }); });
   n.on('scoreboard', (rows) => hud.setScoreboard(rows, n.mirror.youId));
   n.on('error', (code) => {
     if (code === 'insufficient_funds') { leaveToMenu(); screens.toast(t('toast.notEnough')); }

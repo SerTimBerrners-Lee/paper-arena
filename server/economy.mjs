@@ -285,6 +285,23 @@ export const endLifeByDeath = db.transaction((victimMpId, opts = {}) => {
   return { stakeCents: stake, payoutToKillerCents: payout, killerUserId: hasKiller ? killerUserId : null };
 });
 
+// Domination WIN: the player conquered the arena (owns >90% of the board). Their per-kill
+// rewards were already paid as each rival died; here we just return THEIR OWN stake (they
+// survived and won) and stamp the life as 'win'. Idempotent on `win:<mp>`.
+export const endLifeByWin = db.transaction((mpId, opts = {}) => {
+  const mp = getMatchPlayer(mpId);
+  if (!mp || mp.ended_at != null) return null;
+  const stake = mp.stake_cents;
+  const { victimKills = 0, victimArea = 0, victimDurationMs = 0 } = opts;
+  post(randomUUID(), 'escrow', `user:${mp.user_id}`, stake, 'win', `win:${mpId}`, mpId);
+  db.prepare('UPDATE users SET frozen_cents = frozen_cents - ? WHERE id = ?').run(stake, mp.user_id);
+  db.prepare(`UPDATE match_players SET ended_at = ?, result = 'win', stake_returned_cents = ?,
+                 kills = ?, max_area_cells = ?, duration_ms = ? WHERE id = ?`)
+    .run(Date.now(), stake, victimKills, victimArea, victimDurationMs, mpId);
+  bumpStats(mp.user_id, { returned: stake, area: victimArea, streak: victimKills });
+  return { returnedCents: stake };
+});
+
 // A bot has no stake of its own, but we treat it AS IF it paid the entry fee:
 // killing a bot mints the same 90% reward to the human killer (10% rake to house).
 // This injects money into circulation (mint just goes more negative), so the

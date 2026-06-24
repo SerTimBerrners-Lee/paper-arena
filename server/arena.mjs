@@ -8,7 +8,7 @@ import { Snapshotter } from './snapshotter.mjs';
 import { Session } from './session.mjs';
 import { encodeKeyframe, peekOp, OP, decodeInput, STATUS } from '../src/net/protocol.mjs';
 import {
-  createMatch, startLife, endLifeByDeath, settleBotKill, getWallet, DEFAULT_STAKE_CENTS,
+  createMatch, startLife, endLifeByDeath, endLifeByWin, settleBotKill, getWallet, DEFAULT_STAKE_CENTS,
   practiceStake, practiceReward, getPracticeWallet, recordBotFlag,
 } from './economy.mjs';
 import { scoreTelemetry, SUSPECT_THRESHOLD, noteInput, noteDeath, noteRespawn } from './antibot.mjs';
@@ -135,6 +135,9 @@ export class Arena {
       if (e.killerId != null && e.killerId !== e.id) this.fragCount[e.killerId] += 1; // any killer (bot too)
       this.onDeath(e);
     }
+    // 5b. domination: a player conquered the board → settle their win + reset the round.
+    const dom = events.find((e) => e.type === 'domination');
+    if (dom) this._onDomination(dom.id);
     // 6. respawn dead BOT slots (humans respawn on request)
     for (let id = 0; id < MAX_SLOTS; id += 1) {
       const p = this.game.players[id];
@@ -259,6 +262,54 @@ export class Arena {
         wallet: killerLife.mpId != null && killerLife.userId ? getWallet(killerLife.userId) : null,
       });
     }
+  }
+
+  // ── domination win ────────────────────────────────────────────────────────────
+  // The conqueror's per-kill rewards were already paid (each rival died this tick); here
+  // we return THEIR stake (a win, not a loss), tell them they won, end their life, and
+  // reset the board for a fresh round.
+  _onDomination(slot) {
+    const s = this.slotSession[slot];
+    const life = this.lives[slot];
+    if (life) {
+      let returned = 0;
+      if (life.mpId != null && s) {
+        const r = endLifeByWin(life.mpId, { victimKills: life.kills, victimArea: life.maxArea, victimDurationMs: Date.now() - life.startMs });
+        returned = r ? r.returnedCents : 0;
+      } else if (life.practice && s) {
+        practiceReward(s.userId, life.stakeCents); // return the practice stake on a win
+        returned = life.stakeCents;
+      }
+      if (s) this.sendJSON(s, {
+        type: 'victory', mode: life.mode, practice: !!life.practice,
+        kills: life.kills, earnedCents: life.earnedCents, returnedCents: returned,
+        areaCells: life.maxArea, areaPct: life.maxArea / this.game.cellCount,
+        durationMs: Date.now() - life.startMs,
+        wallet: life.mpId != null && s.userId ? getWallet(s.userId) : null,
+        practiceBalanceCents: life.practice && s.userId ? getPracticeWallet(s.userId).practiceBalanceCents : null,
+      });
+      this.lives[slot] = null;
+    }
+    this._resetBoard();
+  }
+
+  // Fresh round: wipe the whole grid, respawn bots onto new homes, leave humans (the winner
+  // + the conquered) dead so they re-enter via their result screen, then re-baseline every
+  // client with a keyframe (the board changed wholesale, a delta would be huge).
+  _resetBoard() {
+    this.game.owner.fill(-1);
+    this.game.trail.fill(-1);
+    for (let id = 0; id < MAX_SLOTS; id += 1) {
+      const p = this.game.players[id];
+      p.area = 0; p.trailCells.length = 0; p.idleTicks = 0; p._stuckTicks = 0;
+      this.fragCount[id] = 0; this.deadTicks[id] = 0;
+      const s = this.slotSession[id];
+      if (s && s.slotId === id) p.alive = false;     // winner + conquered humans re-enter on request
+      else respawnPlayer(this.game, id);             // bots get a fresh home
+    }
+    this.game.version += 1;
+    this.snap.resync(this.game);
+    for (const s of this.sessions) this.sendKeyframe(s);
   }
 
   // ── socket lifecycle ────────────────────────────────────────────────────────

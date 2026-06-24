@@ -62,6 +62,7 @@ const DEFAULT_CONFIG = {
   seed: 1,
   idleDeathSeconds: 20, // camp safe on your own land this long (no trail/capture/kill) → die of inactivity (0 = off)
   botStuckTicks: 24,    // a wall-jammed / boxed-in BOT that can't move dies after this many ticks (clears stray trails; 0 = off)
+  dominationFraction: 0.9, // own this share of the board → you conquered the arena (win + round reset); 0 = off
 };
 
 // ---- seeded RNG (mulberry32) -------------------------------------------------
@@ -85,6 +86,9 @@ export function createGame(userConfig = {}) {
   config.idleDeathTicks = config.idleDeathTicks != null
     ? config.idleDeathTicks
     : Math.round((config.idleDeathSeconds || 0) * config.ticksPerSecond);
+  config.dominationCells = config.dominationCells != null
+    ? config.dominationCells
+    : Math.floor((config.dominationFraction || 0) * config.cols * config.rows);
   const { cols, rows } = config;
   const n = cols * rows;
 
@@ -583,6 +587,21 @@ function captureTerritory(game, p) {
   // standing on (disconnected fragments left behind by a split are removed).
   for (const q of game.players) {
     if (q.alive && q.area > 0) pruneTerritory(game, q);
+  }
+
+  // Domination: owning (almost) the whole board ends the round. Wipe out everyone still
+  // standing (credited to the conqueror) and flag a win — the arena returns the winner's
+  // stake and resets the board. (The winner is NOT killed here; the arena settles them.)
+  const domCells = game.config.dominationCells;
+  if (domCells > 0 && p.area >= domCells) {
+    for (const q of game.players) {
+      if (!q.alive || q === p) continue;
+      killPlayer(game, q);
+      q._reason = 'conquered'; q._killerId = p.id;
+      game.events.push({ type: 'death', id: q.id, reason: 'conquered', killerId: p.id });
+      if (q.isHuman) { game.over = true; game.deathReason = 'conquered'; }
+    }
+    game.events.push({ type: 'domination', id: p.id });
   }
 
   game.version += 1;

@@ -437,8 +437,8 @@ export function createScreens(handlers = {}) {
     show('death');
     const p = panels.death;
     p.innerHTML = '';
-    p.appendChild(el('h1', 'death-title', t('death.title')));
-    p.appendChild(el('p', 'death-reason', reasonText(d.reason)));
+    p.appendChild(el('h1', d.won ? 'death-title win' : 'death-title', d.won ? t('victory.title') : t('death.title')));
+    p.appendChild(el('p', 'death-reason', d.won ? t('victory.reason') : reasonText(d.reason)));
     const grid = el('div', 'stat-grid');
     for (const [k, v] of [
       ['death.territory', `${((d.areaPct || 0) * 100).toFixed(1)}%`],
@@ -465,7 +465,7 @@ export function createScreens(handlers = {}) {
         p.appendChild(el('div', 'wallet-wrap',
           `<div class="wallet-badge practice"><span>${t('card.practice')}</span><strong>${fmtMoney(d.practiceBalanceCents)}</strong></div>`));
       }
-      if (earned > 0) confettiBurst();
+      if (earned > 0 || d.won) confettiBurst();
     }
 
     const bal = isPractice ? (d.practiceBalanceCents ?? 0) : (user ? user.balanceCents : 0);

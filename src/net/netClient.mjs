@@ -25,7 +25,7 @@ export class NetClient {
     this._intentDir = null;
     this._lastDeltaTime = 0;
     this._closedByUs = false;
-    this._cb = { keyframe: [], status: [], respawn: [], wallet: [], kill: [], death: [], cashout: [], error: [], scoreboard: [], idle: [] };
+    this._cb = { keyframe: [], status: [], respawn: [], wallet: [], kill: [], death: [], victory: [], cashout: [], error: [], scoreboard: [], idle: [] };
     this.mirror = {
       cols: 0, rows: 0, cellCount: 0,
       owner: new Int16Array(0), trail: new Int16Array(0),
@@ -93,6 +93,7 @@ export class NetClient {
       case 'wallet': this._emit('wallet', m); break;
       case 'kill': this._emit('kill', m); break;
       case 'death': this.mirror.over = true; this.mirror.deathReason = m.reason; this._emit('death', m); break;
+      case 'victory': this.mirror.over = true; this._emit('victory', m); break;
       case 'scoreboard': this._emit('scoreboard', m.rows); break;
       case 'idle': this._emit('idle', m.seconds); break;
       case 'error': this._emit('error', m.code); break;
