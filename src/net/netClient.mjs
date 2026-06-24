@@ -7,6 +7,11 @@ import {
 } from './protocol.mjs';
 
 const TICK_MS = 1000 / 12;
+// client-side jitter buffer: play snapshots back on a steady clock a couple of ticks
+// behind the newest received one, so brief network stalls smooth out instead of
+// producing the freeze→teleport you get when rendering straight at the latest packet.
+const BUFFER_TICKS = 2;   // start playback once this many deltas are queued (~250ms cushion)
+const MAX_LAG = 8;        // if we fall this far behind the newest delta, fast-forward (long-stall recovery)
 
 function apiHost() {
   const env = (import.meta && import.meta.env) || {};
@@ -25,6 +30,12 @@ export class NetClient {
     this._intentDir = null;
     this._lastDeltaTime = 0;
     this._closedByUs = false;
+    // playout buffer state
+    this._queue = [];        // decoded deltas awaiting playout
+    this._acc = 0;           // ms accumulated toward the next tick
+    this._lastPump = null;
+    this._playing = false;
+    this._alpha = 1;         // interpolation fraction within the current tick
     this._cb = { keyframe: [], status: [], respawn: [], wallet: [], kill: [], death: [], cashout: [], error: [], scoreboard: [] };
     this.mirror = {
       cols: 0, rows: 0, cellCount: 0,
@@ -72,17 +83,38 @@ export class NetClient {
     return this._intentDir || (me && me.dir) || 'right';
   }
 
-  getAlpha() {
-    if (!this._lastDeltaTime) return 1;
-    const dt = performance.now() - this._lastDeltaTime;
-    return dt < 0 ? 0 : dt > TICK_MS ? 1 : dt / TICK_MS;
+  getAlpha() { return this._alpha; }
+
+  // Advance the playout clock and apply buffered deltas at a steady 12 tps, keeping a
+  // small reserve so brief network jitter doesn't stall the render. Call once per frame.
+  pump(now) {
+    if (this._lastPump == null) this._lastPump = now;
+    const dt = now - this._lastPump;
+    this._lastPump = now;
+    if (!this._playing) {
+      if (this._queue.length > BUFFER_TICKS) this._playing = true; // enough cushion buffered
+      else { this._alpha = 1; return; }                            // still buffering → hold latest applied state
+    }
+    // long-stall recovery: a burst left us far behind → fast-forward through the backlog
+    while (this._queue.length > MAX_LAG) this._consumeDelta(this._queue.shift());
+    this._acc += dt;
+    // steady playout: one tick per TICK_MS, always leaving >=1 queued as the reserve cushion
+    while (this._acc >= TICK_MS && this._queue.length > 1) {
+      this._consumeDelta(this._queue.shift());
+      this._acc -= TICK_MS;
+    }
+    if (this._queue.length <= 1 && this._acc > TICK_MS) this._acc = TICK_MS; // starved → hold at latest, no overshoot
+    this._alpha = this._acc <= 0 ? 0 : this._acc >= TICK_MS ? 1 : this._acc / TICK_MS;
   }
 
   _onMessage(data) {
     if (typeof data === 'string') { this._onControl(data); return; }
     const op = peekOp(data);
     if (op === OP.KEYFRAME) this._applyKeyframe(decodeKeyframe(data));
-    else if (op === OP.DELTA) this._applyDelta(decodeDelta(data));
+    else if (op === OP.DELTA) {
+      this._queue.push(decodeDelta(data));
+      if (this._queue.length > 600) this._queue.shift(); // hard safety cap (~50s); pump normally drains it
+    }
   }
 
   _onControl(text) {
@@ -113,11 +145,13 @@ export class NetClient {
     M.version += 1;
     this._lastDeltaTime = performance.now();
     this._intentDir = null;
+    // restart the playout buffer from this fresh authoritative baseline
+    this._queue = []; this._acc = 0; this._lastPump = null; this._playing = false; this._alpha = 1;
     this._emit('keyframe');
     this._emit('status', M.status, 0, 0);
   }
 
-  _applyDelta(d) {
+  _consumeDelta(d) {
     const M = this.mirror;
     M.status = d.status === 1 ? 'active' : 'waiting';
     for (const [i, v] of d.ownerChanges) M.owner[i] = v;
