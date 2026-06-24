@@ -18,6 +18,8 @@ const MAX_SLOTS = 16;
 const MIN_HUMANS = 2;
 const TICK_MS = 1000 / 12;
 const RESPAWN_TICKS = 24;        // bots come back ~2s after death
+const SEND_HIGH_WATER = 128 * 1024; // bytes buffered to a socket before we treat the client as "behind"
+const SEND_RESYNC_LOW = 16 * 1024;  // once its buffer drains below this, resync that client with a keyframe
 const EPOCH_TICKS = 12 * 60 * 3; // ~3 min of active play per provably-fair epoch
 
 function sanitizeName(n) {
@@ -182,7 +184,7 @@ export class Arena {
   }
   broadcastScoreboard() {
     const msg = JSON.stringify({ type: 'scoreboard', rows: this.buildScoreboard() });
-    for (const s of this.sessions) if (s.ws) try { s.ws.send(msg); } catch {}
+    for (const s of this.sessions) if (s.ws && !s.behind) try { s.ws.send(msg); } catch {}
   }
 
   // ── economy: settle one death event ──────────────────────────────────────────
@@ -371,7 +373,29 @@ export class Arena {
     try { s.ws.send(encodeKeyframe(this.game, s.slotId >= 0 ? s.slotId : 0, this.status)); } catch {}
   }
   sendJSON(s, obj) { if (s.ws) try { s.ws.send(JSON.stringify(obj)); } catch {} }
-  broadcast(buf) { for (const s of this.sessions) if (s.ws) try { s.ws.send(buf); } catch {} }
+  // Backpressure-aware broadcast. A slow client (e.g. flaky mobile link) can't drain 12
+  // deltas/s; if we keep sending, its socket buffer balloons into a multi-second freeze.
+  // So when a socket falls behind we STOP feeding it deltas until it drains, then hand it
+  // a fresh keyframe to re-baseline (deltas are incremental, so skipped ones can't be lost).
+  broadcast(buf) {
+    for (const s of this.sessions) {
+      if (!s.ws) continue;
+      let buffered = 0;
+      try { buffered = s.ws.getBufferedAmount ? s.ws.getBufferedAmount() : 0; } catch {}
+      if (buffered > SEND_HIGH_WATER) {
+        if (!s.behind) { s.behind = true; console.log(`[net] slot ${s.slotId} behind (buffered=${buffered}) — throttling`); }
+        continue;
+      }
+      if (s.behind) {
+        if (buffered > SEND_RESYNC_LOW) continue; // still draining the backlog
+        s.behind = false;
+        console.log(`[net] slot ${s.slotId} drained → keyframe resync`);
+        this.sendKeyframe(s);
+        continue;
+      }
+      try { s.ws.send(buf); } catch {}
+    }
+  }
   broadcastStatus(humans) {
     const msg = JSON.stringify({ type: 'status', status: 'waiting', humans, needed: this.minHumans });
     for (const s of this.sessions) if (s.ws) try { s.ws.send(msg); } catch {}
