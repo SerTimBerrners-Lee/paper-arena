@@ -22,6 +22,7 @@ const SEND_HIGH_WATER = 128 * 1024; // bytes buffered to a socket before we trea
 const SEND_RESYNC_LOW = 16 * 1024;  // once its buffer drains below this, resync that client with a keyframe
 const IDLE_WARN_TICKS = 6 * 12;     // show the inactivity countdown over the last 6 seconds
 const EPOCH_TICKS = 12 * 60 * 3; // ~3 min of active play per provably-fair epoch
+const INTERMISSION_TICKS = 12 * 3; // ~3s frozen "match over" beat after a domination, before the next PAID match
 
 function sanitizeName(n) {
   if (typeof n !== 'string') return '';
@@ -59,6 +60,8 @@ export class Arena {
     this.status = STATUS.WAITING;
     this._wasActive = false;
     this._sentWaiting = false;
+    this.phase = 'live';            // 'live' | 'intermission' (post-domination match-over freeze)
+    this._intermissionLeft = 0;
     this.match = mode === 'wager' ? createMatch('wager', this.stakeCents, this.game.config.seed) : null;
   }
 
@@ -96,6 +99,16 @@ export class Arena {
   }
 
   step() {
+    // Post-domination match-over: the final conquered board sits FROZEN for everyone (no
+    // sim, no deltas) while each player holds on their result screen, then a fresh PAID
+    // match opens. This makes a win a discrete game that ends for all — the next one costs
+    // a new stake.
+    if (this.phase === 'intermission') {
+      this._intermissionLeft -= 1;
+      if (this._intermissionLeft > 0) return;
+      this._startNextMatch();
+      return;
+    }
     const humans = this.countHumans();
     this.status = humans >= this.minHumans ? STATUS.ACTIVE : STATUS.WAITING;
 
@@ -264,13 +277,17 @@ export class Arena {
     }
   }
 
-  // ── domination win ────────────────────────────────────────────────────────────
-  // The conqueror's per-kill rewards were already paid (each rival died this tick); here
-  // we return THEIR stake (a win, not a loss), tell them they won, end their life, and
-  // reset the board for a fresh round.
+  // ── domination win — MATCH OVER for everyone ────────────────────────────────────
+  // A player conquered the whole arena → the match ENDS for all. The conqueror's per-kill
+  // rewards were already paid (each rival died this tick, credited to them); here we return
+  // THEIR stake (a win, not a loss) and show them the victory screen. Every rival already
+  // got a 'conquered' death screen; remaining clients (spectating/waiting) get a match-over
+  // notice. Then the whole arena FREEZES for a short beat (the final conquered board stays
+  // on screen) before a fresh PAID match opens — playing again costs a new stake.
   _onDomination(slot) {
     const s = this.slotSession[slot];
     const life = this.lives[slot];
+    const winnerName = this.game.players[slot] ? this.game.players[slot].name : 'Player';
     if (life) {
       let returned = 0;
       if (life.mpId != null && s) {
@@ -290,7 +307,26 @@ export class Arena {
       });
       this.lives[slot] = null;
     }
+    // tell EVERYONE the match ended (winner & conquered already have richer screens; the
+    // client only surfaces this as a toast when no result screen is already up).
+    const over = { type: 'matchover', winner: winnerName, winnerSlot: slot };
+    for (const o of this.sessions) this.sendJSON(o, over);
+    // freeze the arena on the final board, then open the next match.
+    this.phase = 'intermission';
+    this._intermissionLeft = INTERMISSION_TICKS;
+  }
+
+  // End of the frozen interlude → a brand-new PAID match: roll a fresh provably-fair seed
+  // (a new match deserves a new commit), wipe the board, and honour any "play again" the
+  // players queued while the arena was frozen.
+  _startNextMatch() {
+    this._rollEpoch();   // reveal the just-ended match's seed, commit + reseed a new one
     this._resetBoard();
+    this.phase = 'live';
+    for (const s of this.sessions) {
+      if (s.queuedRespawn) { s.queuedRespawn = false; this.respawn(s); }
+      else if (s.queuedJoinName != null) { const n = s.queuedJoinName; s.queuedJoinName = null; this.joinSlot(s, n); }
+    }
   }
 
   // Fresh round: wipe the whole grid, respawn bots onto new homes, leave humans (the winner
@@ -368,6 +404,8 @@ export class Arena {
   // ── join / leave ────────────────────────────────────────────────────────────
   joinSlot(s, name) {
     if (s.slotId >= 0) { this.sendKeyframe(s); return; } // already in
+    // arena frozen between matches: remember the request and honour it when the next one opens
+    if (this.phase === 'intermission') { s.queuedJoinName = name || ''; return; }
     // one active life per user — block a second tab from staking the same account twice
     if (s.userId) {
       for (const o of this.sessions) {
@@ -406,6 +444,7 @@ export class Arena {
 
   respawn(s) {
     if (s.slotId < 0) return;
+    if (this.phase === 'intermission') { s.queuedRespawn = true; return; } // wait for the next match
     if (this.game.players[s.slotId].alive) return; // not actually dead
     noteRespawn(s.tel, Date.now()); // anti-bot: how fast after death they re-enter
     if (!this.openLife(s, s.slotId)) return;       // stake refused → stay on death screen

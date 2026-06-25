@@ -78,6 +78,9 @@ function wireNet(n) {
   n.on('idle', (secs) => hud.setIdle(secs));
   n.on('death', (d) => { hud.setIdle(0); screens.setWallet(d.wallet); screens.showDeath(d); });
   n.on('victory', (d) => { hud.setIdle(0); screens.setWallet(d.wallet); screens.showDeath({ ...d, won: true }); });
+  // someone conquered the arena → match over for all; the winner/conquered already have a
+  // result screen, so only nudge spectators/waiting players with a toast.
+  n.on('matchover', (m) => { hud.setIdle(0); if (!screens.isOpen()) screens.toast(t('toast.matchOver', { name: m.winner })); });
   n.on('scoreboard', (rows) => hud.setScoreboard(rows, n.mirror.youId));
   n.on('error', (code) => {
     if (code === 'insufficient_funds') { leaveToMenu(); screens.toast(t('toast.notEnough')); }

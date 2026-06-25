@@ -11,5 +11,7 @@ export class Session {
     this.mode = 'wager';    // 'wager' (staked) | 'practice' (free)
     this.tel = newTelemetry(); // anti-bot behavioural telemetry
     this.idleWarn = 0;         // last inactivity-countdown second sent to this client (0 = none)
+    this.queuedRespawn = false;   // "play again" pressed during a match-over freeze → honoured next match
+    this.queuedJoinName = null;   // join requested during a match-over freeze → honoured next match
   }
 }

@@ -46,6 +46,7 @@ const DICT = {
     'toast.loginFailed': 'Login failed', 'toast.cashedOut': 'Cashed out +{amount}',
     'toast.notEnough': 'Not enough balance to stake', 'toast.full': 'Arena is full — try again', 'toast.connectFailed': 'Connection failed — try again',
     'toast.alreadyInGame': "You're already in a game in another tab",
+    'toast.matchOver': 'Match over — {name} conquered the arena',
   },
   ru: {
     'common.back': 'НАЗАД', 'common.balance': 'БАЛАНС', 'common.signOut': 'выйти',
@@ -91,6 +92,7 @@ const DICT = {
     'toast.loginFailed': 'Ошибка входа', 'toast.cashedOut': 'Забрано +{amount}',
     'toast.notEnough': 'Недостаточно баланса', 'toast.full': 'Арена заполнена — попробуй ещё', 'toast.connectFailed': 'Не удалось подключиться — попробуй ещё',
     'toast.alreadyInGame': 'Ты уже в игре в другой вкладке',
+    'toast.matchOver': 'Матч окончен — {name} захватил арену',
   },
   uk: {
     'common.back': 'НАЗАД', 'common.balance': 'БАЛАНС', 'common.signOut': 'вийти',
@@ -136,6 +138,7 @@ const DICT = {
     'toast.loginFailed': 'Помилка входу', 'toast.cashedOut': 'Забрано +{amount}',
     'toast.notEnough': 'Недостатньо балансу', 'toast.full': 'Арена заповнена — спробуй ще', 'toast.connectFailed': 'Не вдалося підключитися — спробуй ще',
     'toast.alreadyInGame': 'Ти вже у грі в іншій вкладці',
+    'toast.matchOver': 'Матч завершено — {name} захопив арену',
   },
 };
 
